@@ -87,17 +87,40 @@ jobs:
           }
           Write-Host "RDP is reachable ✅"
 
-      - name: Maintain Connection
+      - name: Display Connection Info and Keep Alive
+        shell: powershell
         run: |
           Write-Host ""
           Write-Host "================ RDP ACCESS ================"
           Write-Host "Address  : $env:TAILSCALE_IP"
           Write-Host "Username : $env:RDP_USER"
           Write-Host "Password : $env:RDP_PASS"
+          Write-Host "Port     : 3389"
           Write-Host "============================================"
           Write-Host ""
 
+          # Keep-alive loop with status reporting
+          $iteration = 0
+          $startTime = Get-Date
+
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Active..."
-              Start-Sleep -Seconds 300
+              $iteration++
+              $elapsed = (Get-Date) - $startTime
+              $hours   = [math]::Floor($elapsed.TotalHours)
+              $minutes = $elapsed.Minutes
+              $seconds = $elapsed.Seconds
+
+              Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Active for $($hours)h $($minutes)m $($seconds)s - Loop $iteration"
+
+              # Verify Tailscale is still connected every 10 loops
+              if ($iteration % 10 -eq 0) {
+                  $tsStatus = & "$env:ProgramFiles\Tailscale\tailscale.exe" status 2>$null
+                  if ($LASTEXITCODE -ne 0) {
+                      Write-Warning "Tailscale may be disconnected!"
+                  } else {
+                      Write-Host "Tailscale OK"
+                  }
+              }
+
+              Start-Sleep -Seconds 60
           }
